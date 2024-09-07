@@ -1,0 +1,28 @@
+html, body {
+  font-family: Arial, sans-serif;
+  color: #FFFFFF;
+  background: #282820;
+  font-size: 20px;
+}
+
+.hidden {
+  display: none;
+}
+
+.main-container {
+  display: block;
+  margin: auto;
+  padding: 14px;
+  max-width: 1000px;
+}
+
+.error-message {
+  color: #FF0000;
+}
+
+.nav-text {
+  display: block;
+  margin: 5px 0px;
+  color: #FFFFFF;
+  text-decoration: underline;
+}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="index, follow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./assets/pure-min.css">
+  <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>Buckslinger</title>
+</head>
+
+<body>
+
+  <div class="main-container">
+    <h1 class="title">
+      Buckslinger 🦌
+    </h1>
+
+    <h2>Add Account</h2>
+
+    <label>Bank account</label>
+    <br />
+    <input type="text" id="bank-account-text-box" />
+    <br />
+    <label>Address</label>
+    <br />
+    <input type="text" id="onchain-account-text-box" />
+    <br />
+    <label>ENS or Base Name</label>
+    <br />
+    <input type="text" id="ens-text-box" />
+    <br />
+    <input type="submit" id="submit" />
+
+  </div>
+  <div id="error-message" class="error-message"></div>
+  <footer>
+    <!-- Logged In -->
+    <div id="btn-logged-in" class="grid btn-logged-in hidden">
+      <button id="logout" class="btn">Logout</button>
+    </div>
+  </footer>
+
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/no-modal"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/ethereum-provider"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/openlogin-adapter"></script>
+
+<script type="text/javascript">
+const buttonLoggedIn = document.getElementById('btn-logged-in');
+const logoutButton = document.getElementById('logout');
+const bankAccountTextBox = document.getElementById('bank-account-text-box');
+const onchainAccountTextBox = document.getElementById('onchain-account-text-box');
+const ensTextBox = document.getElementById('ens-text-box');
+const submitButton = document.getElementById('submit');
+const errorMessageContainer = document.getElementById('error-message');
+
+const clientId = "BOe9txnBHbX0R0Nz_b1uug85F7HI9g_VNLB9Qo-7NggZJayjM-NmWZ8QAuVyKQ6mR6jFZSfsnKVcY-WjxzlDWjY"; // web3auth
+
+async function getAccountData(userInfo) {
+  try {
+    const response = await fetch('/api/get-account', {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + userInfo.idToken,
+      },
+      method: 'GET',
+      // body: JSON.stringify({}),
+    });
+    const accountData = await response.json();
+    errorMessageContainer.innerText = '';
+    if (response.status === 200) {
+      return accountData;
+    } else {
+      errorMessageContainer.innerText = JSON.stringify(response);
+    }
+  } catch(err) {
+    console.error(err);
+    errorMessageContainer.innerText = JSON.stringify(err);
+    return false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check if user is in PWA or in webpage
+  const urlParams = new URLSearchParams(window.location.search);
+
+  if (urlParams.get('standalone')) {
+    // is PWA
+    // const homescreenRec = document.getElementById('homescreen-rec');
+    // homescreenRec.classList.add('hidden');
+  } else {
+    // is regular web browser
+  }
+
+  const chainConfig = {
+    chainNamespace: 'eip155',// CHAIN_NAMESPACES.EIP155,
+    chainId: "0x14a34",
+    rpcTarget: "https://sepolia.base.org",
+    // Avoid using public rpcTarget in production.
+    // Use services like Infura, Quicknode etc
+    displayName: "Base Sepolia Testnet",
+    blockExplorerUrl: "https://sepolia.basescan.org",
+    ticker: "ETH",
+    tickerName: "Ethereum",
+    logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+  };
+
+  const privateKeyProvider = new window.EthereumProvider.EthereumPrivateKeyProvider({ config: { chainConfig } });
+
+  web3auth = new window.NoModal.Web3AuthNoModal({
+    clientId,
+    privateKeyProvider,
+    web3AuthNetwork: "sapphire_devnet",
+  });
+
+  const openloginAdapter = new window.OpenloginAdapter.OpenloginAdapter();
+  web3auth.configureAdapter(openloginAdapter);
+
+  await web3auth.init();
+
+  if (!web3auth.connected) {
+    console.log('user not logged in');
+    window.location.href = './';
+  } else {
+    buttonLoggedIn.classList.remove('hidden');
+
+    const userInfo = await web3auth.getUserInfo();
+    const accountData = await getAccountData(userInfo);
+    console.log(accountData);
+
+    if (accountData.accounts) {
+      accountData.accounts.forEach(a => {
+        if (a.type === 'bank_account') {
+          bankAccountTextBox.value = a.value;
+        }
+        if (a.type === 'onchain_account') {
+          onchainAccountTextBox.value = a.value;
+        }
+        if (a.type === 'ens') {
+          ensTextBox.value = a.value;
+        }
+      });
+    }
+
+    submitButton.addEventListener('click', async () => {
+      const bankAccount = bankAccountTextBox.value;
+      const onchainAccount = onchainAccountTextBox.value;
+      const ens = ensTextBox.value;
+
+      const response = await fetch('/api/add-accounts', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + userInfo.idToken,
+        },
+        method: 'POST',
+        body: JSON.stringify({
+          bank_account: bankAccount,
+          onchain_account: onchainAccount,
+          ens: ens,
+        }),
+      });
+      errorMessageContainer.innerText = '';
+      if (response.status === 200) {
+        window.location.href = './dashboard';
+      } else {
+        errorMessageContainer.innerText = JSON.stringify(response);
+      }
+    });
+  }
+
+  logoutButton.addEventListener('click', async () => {
+    try {
+      await web3auth.logout();
+      window.location.href = './';
+    } catch (error) {
+      console.error(error.message);
+    }
+  });
+
+});
+
+</script>
+
+</html>

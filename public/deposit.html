@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="index, follow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./assets/pure-min.css">
+  <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>Buckslinger</title>
+</head>
+
+<body>
+
+  <div class="main-container">
+    <h1 class="title">
+      Buckslinger 🦌
+    </h1>
+
+    <h2>Deposit</h2>
+
+    <a href="./dashboard">
+      <label class="nav-text">Dashboard</label>
+    </a>
+
+    <br />
+
+    <input type="submit" id="onchain-deposit-button" value="Onchain Deposit"/><br />
+    <input type="text" id="onchain-deposit-textbox" placeholder="Onchain Deposit Amount"/>
+
+    <br />
+
+    <input type="submit" id="bank-deposit-button" disabled value="Bank Deposit"/>
+    <br />
+    <input type="text" id="bank-deposit-textbox" disabled placeholder="Bank Deposit Amount"/>
+
+  </div>
+  <div id="error-message" class="error-message"></div>
+  <footer>
+    <!-- Logged In -->
+    <div id="btn-logged-in" class="grid btn-logged-in hidden">
+      <button id="logout" class="btn">Logout</button>
+    </div>
+  </footer>
+
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/no-modal"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/ethereum-provider"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/openlogin-adapter"></script>
+<script src="https://cdn.jsdelivr.net/npm/web3@4.12.1/dist/web3.min.js"></script>
+
+<script type="text/javascript">
+const buttonLoggedIn = document.getElementById('btn-logged-in');
+const buttonLoggedOut = document.getElementById('btn-logged-out');
+const logoutButton = document.getElementById('logout');
+const errorMessageContainer = document.getElementById('error-message');
+const onchainDepositButton = document.getElementById('onchain-deposit-button');
+const bankDepositButton = document.getElementById('bank-deposit-button');
+const bankDepositTextbox = document.getElementById('bank-deposit-textbox');
+const onchainDepositTextbox = document.getElementById('onchain-deposit-textbox');
+
+
+const clientId = "BOe9txnBHbX0R0Nz_b1uug85F7HI9g_VNLB9Qo-7NggZJayjM-NmWZ8QAuVyKQ6mR6jFZSfsnKVcY-WjxzlDWjY"; // web3auth
+
+async function getAccountData(userInfo) {
+  try {
+    const response = await fetch('/api/get-account', {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + userInfo.idToken,
+      },
+      method: 'GET',
+      // body: JSON.stringify({}),
+    });
+    const accountData = await response.json();
+    errorMessageContainer.innerText = '';
+    if (response.status === 200) {
+      return accountData;
+    } else {
+      errorMessageContainer.innerText = JSON.stringify(response);
+    }
+  } catch(err) {
+    console.error(err);
+    errorMessageContainer.innerText = JSON.stringify(err);
+    return false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check if user is in PWA or in webpage
+  const urlParams = new URLSearchParams(window.location.search);
+
+  if (urlParams.get('standalone')) {
+    // is PWA
+    // const homescreenRec = document.getElementById('homescreen-rec');
+    // homescreenRec.classList.add('hidden');
+  } else {
+    // is regular web browser
+  }
+
+  const chainConfig = {
+    chainNamespace: 'eip155',// CHAIN_NAMESPACES.EIP155,
+    chainId: "0x14a34",
+    rpcTarget: "https://sepolia.base.org",
+    // Avoid using public rpcTarget in production.
+    // Use services like Infura, Quicknode etc
+    displayName: "Base Sepolia Testnet",
+    blockExplorerUrl: "https://sepolia.basescan.org",
+    ticker: "ETH",
+    tickerName: "Ethereum",
+    logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+  };
+
+  const privateKeyProvider = new window.EthereumProvider.EthereumPrivateKeyProvider({ config: { chainConfig } });
+
+  web3auth = new window.NoModal.Web3AuthNoModal({
+    clientId,
+    privateKeyProvider,
+    web3AuthNetwork: "sapphire_devnet",
+  });
+
+  const openloginAdapter = new window.OpenloginAdapter.OpenloginAdapter();
+  web3auth.configureAdapter(openloginAdapter);
+
+  await web3auth.init();
+
+  if (!web3auth.connected) {
+    console.log('user not logged in');
+    window.location.href = './';
+  } else {
+    buttonLoggedIn.classList.remove('hidden');
+    const userInfo = await web3auth.getUserInfo();
+    const accountData = await getAccountData(userInfo);
+
+    if (accountData.accounts) {
+      let hasBank = false;
+      accountData.accounts.forEach((a) => {
+        if (a.type === 'bank_account') {
+          hasBank = true;
+        }
+      });
+
+      if (hasBank) {
+        bankDepositButton.removeAttribute('disabled');
+        bankDepositTextbox.removeAttribute('disabled');
+        bankDepositButton.addEventListener('click', async () => {
+          const amount = +bankDepositTextbox.value;
+
+          const response = await fetch('/api/bank-deposit', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + userInfo.idToken,
+            },
+            method: 'POST',
+            body: JSON.stringify({
+              amount,
+            }),
+          });
+          errorMessageContainer.innerText = '';
+          if (response.status === 200) {
+            window.location.href = './dashboard';
+          } else {
+            errorMessageContainer.innerText = JSON.stringify(response);
+          }
+        });
+      }
+    }
+
+    onchainDepositButton.addEventListener('click', async () => {
+      try {
+        const amount = +onchainDepositTextbox.value;
+        const web3 = new Web3(window.ethereum);
+
+        const usdcContractAddress = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+        const usdcContractAbi = [{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}];
+
+        const buckslingerAddress = '0x5d66F718284c98b7De7108af2E8b2a2d05aB6F26';
+
+        // Create a new USDC contract instance
+        const usdcContract = new web3.eth.Contract(usdcContractAbi, usdcContractAddress);
+
+        const amountToSendWei = web3.utils.toWei(amount, 'mwei'); // USDC has 6 decimal places, so we use 'mwei' instead of 'ether'
+
+        const accts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const tx = await usdcContract.methods.transfer(buckslingerAddress, amountToSendWei).send({ from: accts[0]});
+        console.log(`Transaction hash:`, tx);
+
+        const response = await fetch('/api/onchain-deposit', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + userInfo.idToken,
+          },
+          method: 'POST',
+          body: JSON.stringify({
+            txHash: tx.transactionHash,
+          }),
+        });
+        errorMessageContainer.innerText = '';
+        if (response.status === 200) {
+          window.location.href = './dashboard';
+        } else {
+          errorMessageContainer.innerText = JSON.stringify(response);
+        }
+      } catch(e) {
+        console.error(e);
+        errorMessageContainer.innerText = JSON.stringify(e);
+      }
+    });
+  }
+
+  logoutButton.addEventListener('click', async () => {
+    try {
+      await web3auth.logout();
+      window.location.href = './';
+    } catch (error) {
+      console.error(error.message);
+    }
+  });
+
+});
+
+</script>
+
+</html>

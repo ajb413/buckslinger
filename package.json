@@ -1,0 +1,19 @@
+{
+  "name": "buckslinger",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "express": "^4.19.2",
+    "hardhat": "^2.22.10",
+    "jose": "^5.8.0",
+    "sqlite3": "^5.1.7",
+    "web3": "^4.12.1"
+  }
+}

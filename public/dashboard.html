@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="index, follow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./assets/pure-min.css">
+  <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>Buckslinger</title>
+</head>
+
+<body>
+
+  <div class="main-container">
+    <h1 class="title">
+      Buckslinger 🦌
+    </h1>
+
+    <h2>Dashboard</h2>
+
+    <h3>Balance</h3>
+    <label id="account-balance" class="account-balance">-</label>
+
+    <h3>Options</h3>
+
+    <a href="./payment">
+      <label class="nav-text">Send / Request Payment</label>
+    </a>
+    <br />
+    <a href="./deposit">
+      <label class="nav-text">Deposit</label>
+    </a>
+    <br />
+    <a href="./history">
+      <label class="nav-text">Transaction History</label>
+    </a>
+    <br />
+    <a href="./add-account">
+      <label class="nav-text">Edit Accounts</label>
+    </a>
+
+  </div>
+  <div id="error-message" class="error-message"></div>
+  <footer>
+    <!-- Logged In -->
+    <div id="btn-logged-in" class="grid btn-logged-in hidden">
+      <button id="logout" class="btn">Logout</button>
+    </div>
+  </footer>
+
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/no-modal"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/ethereum-provider"></script>
+<script src="https://cdn.jsdelivr.net/npm/@web3auth/openlogin-adapter"></script>
+
+<script type="text/javascript">
+const buttonLoggedIn = document.getElementById('btn-logged-in');
+const buttonLoggedOut = document.getElementById('btn-logged-out');
+const logoutButton = document.getElementById('logout');
+const errorMessageContainer = document.getElementById('error-message');
+const accountBalanceElement = document.getElementById('account-balance');
+
+const clientId = "BOe9txnBHbX0R0Nz_b1uug85F7HI9g_VNLB9Qo-7NggZJayjM-NmWZ8QAuVyKQ6mR6jFZSfsnKVcY-WjxzlDWjY"; // web3auth
+
+async function getAccountBalance(userInfo) {
+  try {
+    const response = await fetch('/api/get-account-balance', {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + userInfo.idToken,
+      },
+      method: 'GET',
+      // body: JSON.stringify({}),
+    });
+    const { balance } = await response.json();
+    errorMessageContainer.innerText = '';
+    if (response.status === 200) {
+      return balance;
+    } else {
+      errorMessageContainer.innerText = JSON.stringify(response);
+    }
+  } catch(err) {
+    console.error(err);
+    errorMessageContainer.innerText = JSON.stringify(err);
+    return false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check if user is in PWA or in webpage
+  const urlParams = new URLSearchParams(window.location.search);
+
+  if (urlParams.get('standalone')) {
+    // is PWA
+    // const homescreenRec = document.getElementById('homescreen-rec');
+    // homescreenRec.classList.add('hidden');
+  } else {
+    // is regular web browser
+  }
+
+  const chainConfig = {
+    chainNamespace: 'eip155',// CHAIN_NAMESPACES.EIP155,
+    chainId: "0x14a34",
+    rpcTarget: "https://sepolia.base.org",
+    // Avoid using public rpcTarget in production.
+    // Use services like Infura, Quicknode etc
+    displayName: "Base Sepolia Testnet",
+    blockExplorerUrl: "https://sepolia.basescan.org",
+    ticker: "ETH",
+    tickerName: "Ethereum",
+    logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+  };
+
+  const privateKeyProvider = new window.EthereumProvider.EthereumPrivateKeyProvider({ config: { chainConfig } });
+
+  web3auth = new window.NoModal.Web3AuthNoModal({
+    clientId,
+    privateKeyProvider,
+    web3AuthNetwork: "sapphire_devnet",
+  });
+
+  const openloginAdapter = new window.OpenloginAdapter.OpenloginAdapter();
+  web3auth.configureAdapter(openloginAdapter);
+
+  await web3auth.init();
+
+  if (!web3auth.connected) {
+    console.log('user not logged in');
+    window.location.href = './';
+  } else {
+    buttonLoggedIn.classList.remove('hidden');
+    const userInfo = await web3auth.getUserInfo();
+    const accountBalance = await getAccountBalance(userInfo);
+    accountBalanceElement.innerText = `$${accountBalance}`;
+  }
+
+  logoutButton.addEventListener('click', async () => {
+    try {
+      await web3auth.logout();
+      window.location.href = './';
+    } catch (error) {
+      console.error(error.message);
+    }
+  });
+
+});
+
+</script>
+
+</html>
